@@ -129,8 +129,10 @@ return;
             $this->estado = $doc->estado ?? 'pendiente';
             $this->observaciones = $doc->observaciones ?? '';
         } else {
-            $this->limpiarCampos();
-        }
+    $this->limpiarCampos();
+    // Pre-cargar monto desde el bien
+    $this->monto = $bien->monto_total ?? '';
+}
     }
 
     private function validarCamposUnicos(array $exceptBienIds = []): bool
@@ -267,7 +269,7 @@ return;
         ->orWhereHas('documentacion', function ($q) {
             $q->where('estado', '!=', 'completo');
         })
-        ->with(['cuenta', 'remito'])
+        ->with(['cuenta', 'remito', 'documentacion'])
         ->latest()
         ->take(20)
         ->get();
@@ -355,10 +357,11 @@ public function exportarTodo()
 
     public function seleccionarBien($bienId)
 {
-    $this->grupoSeleccionado = null; // limpiar grupo activo
-    $this->bienesDelGrupo = []; // limpiar posibles grupos previos
+    $this->grupoSeleccionado = null;
+    $this->bienesDelGrupo = [];
     $this->bienSeleccionado = $bienId;
     $this->cargarDocumentacion($bienId);
+    $this->dispatch('scroll-a-formulario');
 }
 
 
@@ -366,20 +369,15 @@ public function exportarTodo()
 public function seleccionarGrupo($key)
 {
     $this->grupoSeleccionado = $key;
-    
-    // Obtener todos los bienes del grupo
     $grupo = $this->pendientes->get($key);
-    
     if ($grupo) {
         $this->bienesDelGrupo = $grupo['items']->pluck('id')->toArray();
-        
-        // Cargar la documentación del primer bien (si existe)
-        // porque todos tendrán la misma
         $primerBien = $grupo['items']->first();
         if ($primerBien) {
             $this->cargarDocumentacion($primerBien->id);
         }
     }
+    $this->dispatch('scroll-a-formulario');
 }
 
 // Modificar el método guardarDocumentacion para aplicar a todos los bienes del grupo
